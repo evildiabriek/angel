@@ -1,0 +1,4 @@
+program ::= ((var | func) ';')*
+var ::= 'let' symbol ':' symbol '=' expression
+func ::= symbol '(' expression ')'
+expression ::= (symbol | digit) ('+' (symbol | digit))?
