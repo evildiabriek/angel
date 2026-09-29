@@ -1,6 +1,7 @@
 const std = @import("std");
 const lexer = @import("../lexer/lexer.zig");
 const zlib = @import("../zlib/root.zig");
+const tokens = @import("../lexer/tokens.zig");
 
 pub const ParsError = error{
     NotNameVar,
@@ -13,52 +14,84 @@ pub const ParsError = error{
     WhereIsMyOperator,
     WhereIsMySemiColon,
     WhereIsMyCloseParenthesis,
+    WhereIsMyFuncName,
+    WhereIsMyFuncReturnType,
+    WhereIsMyOpenBrace,
+    WhereIsMyNameVarParam,
+    WhereIsMyTypeVarParam,
+    WhereIsMyComma,
 };
 
 pub const pars = struct {
     lexx: lexer.lex,
-    pub fn init(lx: lexer.lex) @This() {
+    allocator: std.mem.Allocator,
+    pub fn init(lx: lexer.lex, gpa: std.mem.Allocator) @This() {
         return .{
             .lexx = lx,
+            .allocator = gpa,
         };
     }
 
-    pub fn program(self: *@This()) ParsError!void {
+    pub fn program(self: *@This()) !void {
         while (true) {
             const tkn = self.lexx.getNextToken();
-            if (tkn.kind == .TOKEN_END) break;
-            if (tkn.kind == .TOKEN_SYMBOL and std.mem.eql(u8, tkn.value.?, "let")) {
+            if (tkn.kind == .END) break;
+            if (tkn.kind == .SYMBOL and std.mem.eql(u8, tkn.value.?, "let")) {
                 try self.variables();
-            } else if (tkn.kind == .TOKEN_SYMBOL) {
+            } else if (tkn.kind == .SYMBOL and std.mem.eql(u8, tkn.value.?, "fn")) {
+                try self.defFunc();
+            } else if (tkn.kind == .SYMBOL) {
                 try self.func(tkn.value.?); //trust trust
             } else return ParsError.NotFuncOrVar; //truust
-            if (self.lexx.getNextToken().kind != .TOKEN_SEMI_COLON) return ParsError.WhereIsMySemiColon;
         }
     }
 
-    pub fn variables(self: *@This()) ParsError!void {
+    pub fn variables(self: *@This()) !void {
         const name = self.lexx.getNextToken();
-        if (name.kind != .TOKEN_SYMBOL) return ParsError.NotNameVar;
-        if (self.lexx.getNextToken().kind != .TOKEN_COLON) return ParsError.WhereIsMyColon;
+        if (name.kind != .SYMBOL) return ParsError.NotNameVar;
+        if (self.lexx.getNextToken().kind != .COLON) return ParsError.WhereIsMyColon;
         const tyype = self.lexx.getNextToken();
-        if (tyype.kind != .TOKEN_SYMBOL) return ParsError.WhereIsMyVarType;
-        if (self.lexx.getNextToken().kind != .TOKEN_EQUAL) return ParsError.WhereIsMyEqual;
+        if (tyype.kind != .SYMBOL) return ParsError.WhereIsMyVarType;
+        if (self.lexx.getNextToken().kind != .EQUAL) return ParsError.WhereIsMyEqual;
         try self.expression(); // truuuust
+        if (self.lexx.getNextToken().kind != .SEMI_COLON) return ParsError.WhereIsMySemiColon;
     }
 
-    pub fn func(self: *@This(), _: []const u8) ParsError!void {
-        if (self.lexx.getNextToken().kind != .TOKEN_OPEN_PARANTHESIS) return ParsError.WhereIsMyOpenParenthesis;
+    pub fn func(self: *@This(), _: []const u8) !void {
+        if (self.lexx.getNextToken().kind != .OPEN_PARANTHESIS) return ParsError.WhereIsMyOpenParenthesis;
         try self.expression();
-        if (self.lexx.getNextToken().kind != .TOKEN_CLOSE_PARANTHESIS) return ParsError.WhereIsMyCloseParenthesis;
+        if (self.lexx.getNextToken().kind != .CLOSE_PARANTHESIS) return ParsError.WhereIsMyCloseParenthesis;
+        if (self.lexx.getNextToken().kind != .SEMI_COLON) return ParsError.WhereIsMySemiColon;
     }
 
-    pub fn expression(self: *@This()) ParsError!void {
+    pub fn defFunc(self: *@This()) !void {
+        const name = self.lexx.getNextToken();
+        if (name.kind != .SYMBOL) return ParsError.WhereIsMyFuncName;
+        if (self.lexx.getNextToken().kind != .OPEN_PARANTHESIS) return ParsError.WhereIsMyOpenParenthesis;
+        while (self.lexx.peekNextToken().kind != .CLOSE_PARANTHESIS) {
+            const name2 = self.lexx.getNextToken();
+            if (name2.kind != .SYMBOL) return ParsError.WhereIsMyNameVarParam;
+            if (self.lexx.getNextToken().kind != .COLON) return ParsError.WhereIsMyColon;
+            const tyype2 = self.lexx.getNextToken();
+            if (tyype2.kind != .SYMBOL) return ParsError.WhereIsMyTypeVarParam;
+            const tmp = self.lexx.peekNextToken();
+            if (tmp.kind == .COMMA) _ = self.lexx.getNextToken();
+        }
+        if (self.lexx.getNextToken().kind != .CLOSE_PARANTHESIS) return ParsError.WhereIsMyCloseParenthesis;
+        const tyype = self.lexx.getNextToken();
+        if (tyype.kind != .SYMBOL) return ParsError.WhereIsMyFuncReturnType;
+        if (self.lexx.getNextToken().kind != .OPEN_BRACE) return ParsError.WhereIsMyOpenBrace;
+        while (self.lexx.peekNextToken().kind != .CLOSE_BRACE) _ = self.lexx.getNextToken();
+        _ = self.lexx.getNextToken();
+    }
+
+    pub fn expression(self: *@This()) !void {
         const op1 = self.lexx.getNextToken();
-        if (op1.kind != .TOKEN_SYMBOL and op1.kind != .TOKEN_INT) return ParsError.WhereIsMyPrimary;
+        if (op1.kind != .SYMBOL and op1.kind != .INT) return ParsError.WhereIsMyPrimary;
         const op = self.lexx.peekNextToken();
-        if (op.kind != .TOKEN_PLUS) return;
+        if (op.kind != .PLUS and op.kind != .SUBSTRACTION) return;
         _ = self.lexx.getNextToken();
         const op2 = self.lexx.getNextToken();
-        if (op2.kind != .TOKEN_SYMBOL and op2.kind != .TOKEN_INT) return ParsError.WhereIsMyPrimary;
+        if (op2.kind != .SYMBOL and op2.kind != .INT) return ParsError.WhereIsMyPrimary;
     }
 };

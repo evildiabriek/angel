@@ -1,4 +1,5 @@
-program ::= ((var | func) ';')*
-var ::= 'let' symbol ':' symbol '=' expression
-func ::= symbol '(' expression ')'
-expression ::= (symbol | digit) ('+' (symbol | digit))?
+program ::= (var | call_func | def_func)*
+var ::= 'let' symbol ':' symbol '=' expression ';'
+call_func ::= symbol '(' expression ')' ';'
+def_func ::= 'fn' symbol '(' symbol ':' symbol(',' symbol ':' symbol)* ')' symbol '{' statement '}'
+expression ::= (symbol | digit) (('+' | '-') (symbol | digit))?

@@ -2,6 +2,10 @@ const std = @import("std");
 const tokens = @import("tokens.zig");
 const zlib = @import("../zlib/root.zig");
 
+pub const LexError = error{
+    InvalidCharacter,
+};
+
 pub const lex = struct {
     buff_file: []const u8,
     cursor: usize,
@@ -32,30 +36,33 @@ pub const lex = struct {
 
     pub fn getNextToken(self: *@This()) tokens.s_token {
         skipWhiteSpace(self);
-        if (isEndLen(self)) return .{ .kind = .TOKEN_END, .value = null };
+        if (isEndLen(self)) return .{ .kind = .END, .value = null };
         if (std.ascii.isAlphabetic(self.buff_file[self.cursor])) {
             const lcursor = self.cursor;
             while (std.ascii.isAlphanumeric(self.buff_file[self.cursor]) and !isEndLen(self)) self.cursor += 1;
             return .{
-                .kind = .TOKEN_SYMBOL,
+                .kind = .SYMBOL,
                 .value = self.buff_file[lcursor..self.cursor],
             };
         } else if (std.ascii.isDigit(self.buff_file[self.cursor])) {
             const lcursor = self.cursor;
             while (std.ascii.isDigit(self.buff_file[self.cursor]) and !isEndLen(self)) self.cursor += 1;
             return .{
-                .kind = .TOKEN_INT,
+                .kind = .INT,
                 .value = self.buff_file[lcursor..self.cursor],
             };
         } else {
             defer self.cursor += 1;
             switch (self.buff_file[self.cursor]) {
-                '+' => return .{ .kind = .TOKEN_PLUS, .value = null },
-                '=' => return .{ .kind = .TOKEN_EQUAL, .value = null },
-                ':' => return .{ .kind = .TOKEN_COLON, .value = null },
-                ';' => return .{ .kind = .TOKEN_SEMI_COLON, .value = null },
-                '(' => return .{ .kind = .TOKEN_OPEN_PARANTHESIS, .value = null },
-                ')' => return .{ .kind = .TOKEN_CLOSE_PARANTHESIS, .value = null },
+                '+' => return .{ .kind = .PLUS, .value = null },
+                '=' => return .{ .kind = .EQUAL, .value = null },
+                ':' => return .{ .kind = .COLON, .value = null },
+                ';' => return .{ .kind = .SEMI_COLON, .value = null },
+                '(' => return .{ .kind = .OPEN_PARANTHESIS, .value = null },
+                ')' => return .{ .kind = .CLOSE_PARANTHESIS, .value = null },
+                '{' => return .{ .kind = .OPEN_BRACE, .value = null },
+                '}' => return .{ .kind = .CLOSE_BRACE, .value = null },
+                '-' => return .{ .kind = .SUBSTRACTION, .value = null },
                 else => unreachable,
             }
         }
