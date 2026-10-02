@@ -1,6 +1,3 @@
-let x: i32 = 5;
-let y: i32 = x - 10;
+let x: i32 = 99 / 33;
 
-print(y);
-
-fn add(x: i32) i32 { gougouggagaga }
+print(x);

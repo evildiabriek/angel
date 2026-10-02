@@ -63,7 +63,14 @@ pub const lex = struct {
                 '{' => return .{ .kind = .OPEN_BRACE, .value = null },
                 '}' => return .{ .kind = .CLOSE_BRACE, .value = null },
                 '-' => return .{ .kind = .SUBSTRACTION, .value = null },
-                else => unreachable,
+                '*' => return .{ .kind = .MULTIPLY, .value = null },
+                '/' => return .{ .kind = .DIVISION, .value = null },
+                '<' => return .{ .kind = .INFERIOR, .value = null },
+                '>' => return .{ .kind = .SUPERIOR, .value = null },
+                else => {
+                    std.log.debug("{s}", .{self.buff_file[self.cursor .. self.cursor + 5]});
+                    unreachable;
+                },
             }
         }
     }
