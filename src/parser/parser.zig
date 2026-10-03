@@ -24,6 +24,9 @@ pub const ParsError = error{
     WhereIsMyComma,
     WhereIsMyStatment,
     WhereIsMyVariable,
+    WhereIsMyInt,
+    WhereIsMyOpEqual,
+    WhereIsMyPlusPlus,
 };
 
 pub const s_func = struct {
@@ -118,8 +121,37 @@ pub const pars = struct {
                 try self.func(tkn.value.?);
             } else if (next.kind == .EQUAL) {
                 try self.assign(tkn.value.?); // trust trust
+            } else if (next.kind == .ADD_EQUAL or next.kind == .SUBSTRACTION_EQUAL or next.kind == .MULTIPLY_EQUAL or next.kind == .DIVISION_EQUAL) {
+                try self.optype(tkn.value.?);
+            } else if (next.kind == .PLUSPLUS) {
+                try self.plusplus(tkn.value.?);
             }
         } else return ParsError.NotFuncOrVar; //truust
+    }
+
+    pub fn optype(self: *@This(), name: []const u8) !void {
+        if (!self.hasVar(name)) return ParsError.WhereIsMyVariable;
+        const opptype = self.lexx.getNextToken();
+        if (opptype.kind != .ADD_EQUAL and opptype.kind != .SUBSTRACTION_EQUAL and opptype.kind != .MULTIPLY_EQUAL and opptype.kind != .DIVISION_EQUAL) return ParsError.WhereIsMyOpEqual;
+        const int = try self.expression();
+        if (self.lexx.getNextToken().kind != .SEMI_COLON) return ParsError.WhereIsMySemiColon;
+        const opp: ir.operations = blk: {
+            switch (opptype.kind) {
+                .ADD_EQUAL => break :blk .ADD_EQUAL,
+                .SUBSTRACTION_EQUAL => break :blk .SUBSTRACTION_EQUAL,
+                .MULTIPLY_EQUAL => break :blk .MULTIPLY_EQUAL,
+                .DIVISION_EQUAL => break :blk .DIVISION_EQUAL,
+                else => unreachable,
+            }
+        };
+        _ = self.addCode(.{ .operation = opp, .op1 = .{ .STRING = name }, .op2 = int, .result = null });
+    }
+
+    pub fn plusplus(self: *@This(), name: []const u8) !void {
+        if (!self.hasVar(name)) return ParsError.WhereIsMyVariable;
+        if (self.lexx.getNextToken().kind != .PLUSPLUS) return ParsError.WhereIsMyPlusPlus;
+        if (self.lexx.getNextToken().kind != .SEMI_COLON) return ParsError.WhereIsMySemiColon;
+        _ = self.addCode(.{ .operation = .PLUSPLUS, .op1 = .{ .STRING = name }, .op2 = .{ .VALUE = 1 }, .result = null });
     }
 
     pub fn assign(self: *@This(), name: []const u8) !void {
@@ -232,8 +264,8 @@ pub const pars = struct {
     pub fn expression(self: *@This()) !ir.operands {
         var opp: ir.operands = try self.primary();
         var op = self.lexx.peekNextToken();
-        const tab = [_]tokens.tokens{ .PLUS, .SUBSTRACTION, .MULTIPLY, .DIVISION, .INFERIOR, .SUPERIOR, .OL_AND, .OL_OR, .COMPARE };
-        while (std.mem.containsAtLeastScalar2(tokens.tokens, &tab, op.kind, 1)) {
+        const tab = [_]tokens.tokens{ .PLUS, .SUBSTRACTION, .MULTIPLY, .DIVISION, .INFERIOR, .SUPERIOR, .OL_AND, .OL_OR, .COMPARE, .ADD_EQUAL };
+        while (std.mem.containsAtLeastScalar(tokens.tokens, &tab, op.kind, 1)) {
             _ = self.lexx.getNextToken();
             const tmp: ir.operations = blk: {
                 switch (op.kind) {
@@ -246,6 +278,7 @@ pub const pars = struct {
                     .OL_AND => break :blk .OL_AND,
                     .OL_OR => break :blk .OL_OR,
                     .COMPARE => break :blk .COMPARE,
+                    .ADD_EQUAL => break :blk .ADD_EQUAL,
                     else => unreachable,
                 }
             };

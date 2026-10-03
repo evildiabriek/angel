@@ -27,7 +27,7 @@ pub const lex = struct {
         return false;
     }
 
-    fn skipWhiteSpace(self: *@This()) void {
+    pub fn skipWhiteSpace(self: *@This()) void {
         while (self.cursor < self.buff_file.len and
             (self.buff_file[self.cursor] == ' ' or
                 self.buff_file[self.cursor] == '\n' or
@@ -60,6 +60,21 @@ pub const lex = struct {
         } else if (self.cursor + 1 <= self.buff_file.len and self.buff_file[self.cursor] == '=' and self.buff_file[self.cursor + 1] == '=') {
             self.cursor += 2;
             return .{ .kind = .COMPARE, .value = null };
+        } else if (self.cursor + 1 <= self.buff_file.len and self.buff_file[self.cursor] == '+' and self.buff_file[self.cursor + 1] == '=') {
+            self.cursor += 2;
+            return .{ .kind = .ADD_EQUAL, .value = null };
+        } else if (self.cursor + 1 <= self.buff_file.len and self.buff_file[self.cursor] == '+' and self.buff_file[self.cursor + 1] == '+') {
+            self.cursor += 2;
+            return .{ .kind = .PLUSPLUS, .value = null };
+        } else if (self.cursor + 1 <= self.buff_file.len and self.buff_file[self.cursor] == '-' and self.buff_file[self.cursor + 1] == '=') {
+            self.cursor += 2;
+            return .{ .kind = .SUBSTRACTION_EQUAL, .value = null };
+        } else if (self.cursor + 1 <= self.buff_file.len and self.buff_file[self.cursor] == '*' and self.buff_file[self.cursor + 1] == '=') {
+            self.cursor += 2;
+            return .{ .kind = .MULTIPLY_EQUAL, .value = null };
+        } else if (self.cursor + 1 <= self.buff_file.len and self.buff_file[self.cursor] == '/' and self.buff_file[self.cursor + 1] == '=') {
+            self.cursor += 2;
+            return .{ .kind = .DIVISION_EQUAL, .value = null };
         } else {
             defer self.cursor += 1;
             switch (self.buff_file[self.cursor]) {

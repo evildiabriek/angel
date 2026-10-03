@@ -43,6 +43,12 @@ pub const inter = struct {
             .SUPERIOR => self.setValue(fcode.result.?, boolToInt(self.getValue(fcode.op1) > self.getValue(fcode.op2.?))),
             .OL_AND => self.setValue(fcode.result.?, boolToInt(self.getValue(fcode.op1) != 0 and self.getValue(fcode.op2.?) != 0)),
             .OL_OR => self.setValue(fcode.result.?, boolToInt(self.getValue(fcode.op1) != 0 or self.getValue(fcode.op2.?) != 0)),
+            .COMPARE => self.setValue(fcode.result.?, boolToInt(self.getValue(fcode.op1) == self.getValue(fcode.op2.?))),
+            .ADD_EQUAL => self.setValue(fcode.op1, self.getValue(fcode.op1) + self.getValue(fcode.op2.?)),
+            .PLUSPLUS => self.setValue(fcode.op1, self.getValue(fcode.op1) + self.getValue(fcode.op2.?)),
+            .SUBSTRACTION_EQUAL => self.setValue(fcode.op1, self.getValue(fcode.op1) - self.getValue(fcode.op2.?)),
+            .MULTIPLY_EQUAL => self.setValue(fcode.op1, self.getValue(fcode.op1) * self.getValue(fcode.op2.?)),
+            .DIVISION_EQUAL => self.setValue(fcode.op1, @divTrunc(self.getValue(fcode.op1), self.getValue(fcode.op2.?))),
             .ARGUMENT => _ = try self.argv.append(self.getValue(fcode.op1)),
             .CALL => {
                 for (self.funcs.items) |val| {
