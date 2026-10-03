@@ -1,3 +1,6 @@
-let x: i32 = 99 / 33;
+let max: i32 = 0;
 
-print(x);
+while (1) {
+    max = max + 1;
+    print(max);
+}

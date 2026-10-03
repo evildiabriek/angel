@@ -51,6 +51,15 @@ pub const lex = struct {
                 .kind = .INT,
                 .value = self.buff_file[lcursor..self.cursor],
             };
+        } else if (self.cursor + 1 <= self.buff_file.len and self.buff_file[self.cursor] == '&' and self.buff_file[self.cursor + 1] == '&') {
+            self.cursor += 2;
+            return .{ .kind = .OL_AND, .value = null };
+        } else if (self.cursor + 1 <= self.buff_file.len and self.buff_file[self.cursor] == '|' and self.buff_file[self.cursor + 1] == '|') {
+            self.cursor += 2;
+            return .{ .kind = .OL_OR, .value = null };
+        } else if (self.cursor + 1 <= self.buff_file.len and self.buff_file[self.cursor] == '=' and self.buff_file[self.cursor + 1] == '=') {
+            self.cursor += 2;
+            return .{ .kind = .COMPARE, .value = null };
         } else {
             defer self.cursor += 1;
             switch (self.buff_file[self.cursor]) {
@@ -73,6 +82,8 @@ pub const lex = struct {
                 },
             }
         }
+        std.log.debug("{s}", .{self.buff_file[self.cursor .. self.cursor + 5]});
+        unreachable;
     }
 
     pub fn peekNextToken(self: *@This()) tokens.s_token {

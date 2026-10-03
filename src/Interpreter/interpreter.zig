@@ -3,6 +3,15 @@ const zlib = @import("../zlib/root.zig");
 const ir = @import("../IR/IR.zig");
 const parser = @import("../parser/parser.zig");
 
+// Trash func
+fn boolToInt(b: bool) i32 {
+    if (b) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 pub const inter = struct {
     code: zlib.vector.CreateVec(ir.irm),
     cursor: usize,
@@ -30,6 +39,10 @@ pub const inter = struct {
             .SUBSTRACTION => self.setValue(fcode.result.?, self.getValue(fcode.op1) - self.getValue(fcode.op2.?)),
             .MULTIPLY => self.setValue(fcode.result.?, self.getValue(fcode.op1) * self.getValue(fcode.op2.?)),
             .DIVISION => self.setValue(fcode.result.?, @divTrunc(self.getValue(fcode.op1), self.getValue(fcode.op2.?))),
+            .INFERIOR => self.setValue(fcode.result.?, boolToInt(self.getValue(fcode.op1) < self.getValue(fcode.op2.?))),
+            .SUPERIOR => self.setValue(fcode.result.?, boolToInt(self.getValue(fcode.op1) > self.getValue(fcode.op2.?))),
+            .OL_AND => self.setValue(fcode.result.?, boolToInt(self.getValue(fcode.op1) != 0 and self.getValue(fcode.op2.?) != 0)),
+            .OL_OR => self.setValue(fcode.result.?, boolToInt(self.getValue(fcode.op1) != 0 or self.getValue(fcode.op2.?) != 0)),
             .ARGUMENT => _ = try self.argv.append(self.getValue(fcode.op1)),
             .CALL => {
                 for (self.funcs.items) |val| {

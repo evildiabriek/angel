@@ -1,9 +1,11 @@
 program ::= statement*
 var ::= 'let' symbol ':' symbol '=' expression ';'
 call_func ::= symbol '(' expression ')' ';'
+assign ::= symbol '=' expression ';'
 def_func ::= 'fn' symbol '(' symbol ':' symbol(',' symbol ':' symbol)* ')' symbol '{' statement* '}'
-expression ::= (symbol | digit) (('+' | '-' | '*' | '/' | '<' | '>') (symbol | digit))*
+expression ::= primary (('+' | '-' | '*' | '/' | '<' | '>' | '&&' | '||' | '==') primary)*
 if ::= 'if' '(' expression ')' '{' statement* '}'
 while ::= 'while' '(' expression ')' '{' statement* '}'
 for ::= 'for' '(' expression ')' '{' statement* '}'
-statement ::= var | call_func | def_func | if | while | for
+statement ::= var | call_func | def_func | if | while | for | assign
+primary ::= number | symbol | ("("expression")") | ("-"primary)

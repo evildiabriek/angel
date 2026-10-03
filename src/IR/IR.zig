@@ -1,16 +1,6 @@
 const std = @import("std");
 
-pub const operations = enum {
-    ASSIGN,
-    PLUS,
-    SUBSTRACTION,
-    MULTIPLY,
-    DIVISION,
-    ARGUMENT,
-    CALL,
-    JMP,
-    JMPIFNOT,
-};
+pub const operations = enum { ASSIGN, PLUS, SUBSTRACTION, MULTIPLY, DIVISION, ARGUMENT, CALL, JMP, JMPIFNOT, INFERIOR, SUPERIOR, OL_AND, OL_OR, COMPARE };
 
 pub const operandsType = enum {
     VALUE,

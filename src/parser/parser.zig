@@ -7,6 +7,7 @@ const ir = @import("../IR/IR.zig");
 pub const ParsError = error{
     NotNameVar,
     NotFuncOrVar,
+    ExistingVar,
     WhereIsMyColon,
     WhereIsMyVarType,
     WhereIsMyEqual,
@@ -22,16 +23,30 @@ pub const ParsError = error{
     WhereIsMyTypeVarParam,
     WhereIsMyComma,
     WhereIsMyStatment,
+    WhereIsMyVariable,
 };
 
 pub const s_func = struct {
     name: []const u8,
     code: zlib.vector.CreateVec(ir.irm),
-
+    vars: zlib.vector.CreateVec([]const u8),
     fn addCode(self: *@This(), irmm: ir.irm) usize {
         return self.code.append(irmm) catch {
             unreachable; // On met la poussière sous le tapîs
         };
+    }
+
+    fn addVar(self: *@This(), str: []const u8) usize {
+        return self.vars.append(str) catch {
+            unreachable; // On met la poussière sous le tapîs
+        };
+    }
+
+    fn hasVar(self: *@This(), str: []const u8) bool {
+        for (self.vars.items) |itm| {
+            if (std.mem.eql(u8, itm, str)) return true;
+        }
+        return false;
     }
 };
 
@@ -52,13 +67,24 @@ pub const pars = struct {
         };
     }
 
+    fn addVar(self: *@This(), str: []const u8) usize {
+        //var tmp = self.fstack.getLast();
+        return self.fstack.items[self.fstack.n_of_element - 1].vars.append(str) catch {
+            unreachable;
+        };
+    }
+
+    fn hasVar(self: *@This(), str: []const u8) bool {
+        return self.fstack.items[self.fstack.n_of_element - 1].hasVar(str);
+    }
+
     fn getTmp(self: *@This()) u32 {
         defer self.tmpcounter += 1;
         return self.tmpcounter;
     }
 
     pub fn program(self: *@This()) !void {
-        _ = self.fstack.append(.{ .name = "<root>", .code = .init(self.allocator) }) catch {
+        _ = self.fstack.append(.{ .name = "<root>", .code = .init(self.allocator), .vars = .init(self.allocator) }) catch {
             unreachable;
         };
         while (true) {
@@ -87,8 +113,21 @@ pub const pars = struct {
             //} else if (tkn.kind == .SYMBOL and std.mem.eql(u8, tkn.value.?, "for")) {
             //try self.forr();
         } else if (tkn.kind == .SYMBOL) {
-            try self.func(tkn.value.?); //trust trust
+            const next = self.lexx.peekNextToken();
+            if (next.kind == .OPEN_PARANTHESIS) {
+                try self.func(tkn.value.?);
+            } else if (next.kind == .EQUAL) {
+                try self.assign(tkn.value.?); // trust trust
+            }
         } else return ParsError.NotFuncOrVar; //truust
+    }
+
+    pub fn assign(self: *@This(), name: []const u8) !void {
+        if (!self.hasVar(name)) return ParsError.WhereIsMyVariable;
+        if (self.lexx.getNextToken().kind != .EQUAL) return ParsError.WhereIsMyEqual;
+        const new_val = try self.expression();
+        if (self.lexx.getNextToken().kind != .SEMI_COLON) return ParsError.WhereIsMySemiColon;
+        _ = self.addCode(.{ .operation = .ASSIGN, .op1 = .{ .STRING = name }, .op2 = new_val, .result = null });
     }
 
     pub fn variables(self: *@This()) !void {
@@ -100,6 +139,8 @@ pub const pars = struct {
         if (self.lexx.getNextToken().kind != .EQUAL) return ParsError.WhereIsMyEqual;
         const jsp = try self.expression(); // truuuust
         if (self.lexx.getNextToken().kind != .SEMI_COLON) return ParsError.WhereIsMySemiColon;
+        if (self.hasVar(name.value.?)) return ParsError.ExistingVar;
+        _ = self.addVar(name.value.?);
         _ = self.addCode(.{ .operation = .ASSIGN, .op1 = .{ .STRING = name.value.? }, .op2 = jsp, .result = null });
     }
 
@@ -115,7 +156,7 @@ pub const pars = struct {
     pub fn defFunc(self: *@This()) !void {
         const name = self.lexx.getNextToken();
         if (name.kind != .SYMBOL) return ParsError.WhereIsMyFuncName;
-        _ = self.fstack.append(.{ .name = name.value.?, .code = .init(self.allocator) }) catch {
+        _ = self.fstack.append(.{ .name = name.value.?, .code = .init(self.allocator), .vars = .init(self.allocator) }) catch {
             unreachable;
         };
         if (self.lexx.getNextToken().kind != .OPEN_PARANTHESIS) return ParsError.WhereIsMyOpenParenthesis;
@@ -177,8 +218,9 @@ pub const pars = struct {
     //        _ = self.lexx.getNextToken();
     //    }
 
-    fn tokenToPrimary(tkn: tokens.s_token) !ir.operands {
+    fn tokenToPrimary(self: *@This(), tkn: tokens.s_token) !ir.operands {
         if (tkn.kind == .SYMBOL) {
+            if (!self.hasVar(tkn.value.?)) return ParsError.WhereIsMyVariable;
             return .{ .STRING = tkn.value.? };
         } else if (tkn.kind == .INT) {
             return .{ .VALUE = std.fmt.parseInt(i32, tkn.value.?, 10) catch {
@@ -188,28 +230,26 @@ pub const pars = struct {
     }
 
     pub fn expression(self: *@This()) !ir.operands {
-        const op1 = self.lexx.getNextToken();
-        if (op1.kind != .SYMBOL and op1.kind != .INT) return ParsError.WhereIsMyPrimary;
-        var opp: ir.operands = try tokenToPrimary(op1);
+        var opp: ir.operands = try self.primary();
         var op = self.lexx.peekNextToken();
-        while (op.kind == .PLUS or op.kind == .SUBSTRACTION or op.kind == .MULTIPLY or op.kind == .DIVISION) {
+        const tab = [_]tokens.tokens{ .PLUS, .SUBSTRACTION, .MULTIPLY, .DIVISION, .INFERIOR, .SUPERIOR, .OL_AND, .OL_OR, .COMPARE };
+        while (std.mem.containsAtLeastScalar2(tokens.tokens, &tab, op.kind, 1)) {
             _ = self.lexx.getNextToken();
-            const op2 = self.lexx.getNextToken();
-            if (op2.kind != .SYMBOL and op2.kind != .INT) return ParsError.WhereIsMyPrimary;
             const tmp: ir.operations = blk: {
-                if (op.kind == .PLUS) {
-                    break :blk .PLUS;
-                } else if (op.kind == .SUBSTRACTION) {
-                    break :blk .SUBSTRACTION;
-                } else if (op.kind == .MULTIPLY) {
-                    break :blk .MULTIPLY;
-                } else if (op.kind == .DIVISION) {
-                    break :blk .DIVISION;
-                } else {
-                    unreachable;
+                switch (op.kind) {
+                    .PLUS => break :blk .PLUS,
+                    .SUBSTRACTION => break :blk .SUBSTRACTION,
+                    .MULTIPLY => break :blk .MULTIPLY,
+                    .DIVISION => break :blk .DIVISION,
+                    .INFERIOR => break :blk .INFERIOR,
+                    .SUPERIOR => break :blk .SUPERIOR,
+                    .OL_AND => break :blk .OL_AND,
+                    .OL_OR => break :blk .OL_OR,
+                    .COMPARE => break :blk .COMPARE,
+                    else => unreachable,
                 }
             };
-            const jsp = ir.irm{ .operation = tmp, .op1 = opp, .op2 = try tokenToPrimary(op2), .result = .{ .TMP = self.getTmp() } };
+            const jsp = ir.irm{ .operation = tmp, .op1 = opp, .op2 = try self.primary(), .result = .{ .TMP = self.getTmp() } };
             _ = self.addCode(jsp);
             opp = jsp.result.?;
             op = self.lexx.peekNextToken();
@@ -217,11 +257,39 @@ pub const pars = struct {
         return opp;
     }
 
+    pub fn primary(self: *@This()) ParsError!ir.operands {
+        const op1 = self.lexx.getNextToken();
+        if (op1.kind == .SYMBOL or op1.kind == .INT) {
+            return self.tokenToPrimary(op1);
+        } else if (op1.kind == .OPEN_PARANTHESIS) {
+            const ret = try self.expression();
+            if (self.lexx.getNextToken().kind != .CLOSE_PARANTHESIS) {
+                return ParsError.WhereIsMyCloseParenthesis;
+            }
+            return ret;
+        } else if (op1.kind == .SUBSTRACTION) {
+            const irm = try self.primary();
+            const jsp = ir.irm{ .operation = .SUBSTRACTION, .op1 = .{ .VALUE = 0 }, .op2 = irm, .result = .{ .TMP = self.getTmp() } };
+            _ = self.addCode(jsp);
+            return jsp.result.?;
+        } else {
+            return ParsError.WhereIsMyPrimary;
+        }
+    }
+
     pub fn deinit(self: *@This()) void {
         for (0..self.functions.items.len) |idx| {
             self.functions.items[idx].code.deinit();
+            self.functions.items[idx].vars.deinit();
         }
         self.fstack.deinit();
         self.functions.deinit();
+    }
+
+    pub fn errordeinit(self: *@This()) void {
+        for (0..self.fstack.items.len) |idx| {
+            self.fstack.items[idx].code.deinit();
+            self.fstack.items[idx].vars.deinit();
+        }
     }
 };
