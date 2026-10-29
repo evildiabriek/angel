@@ -1,8 +1,8 @@
 # Angel
 
-## Compilator
+## Interpreter
 
-The compilator is actually in developpement
+The interpreter is actually in developpement
 
 ## Contributor
 evildiabriek (original creator)  
